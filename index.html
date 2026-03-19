@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Tetris Style Puzzle</title>
+
+<style>
+body{
+    background:#111;
+    color:white;
+    text-align:center;
+    font-family:sans-serif;
+}
+
+canvas{
+    background:#000;
+    margin-top:20px;
+    border:4px solid white;
+}
+
+#score{
+    font-size:20px;
+    margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>テトリス風パズル</h1>
+<div id="score">Score: 0</div>
+<canvas id="game" width="240" height="400"></canvas>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const COL = 12;
+const ROW = 20;
+const SIZE = 20;
+
+let board = [];
+let score = 0;
+
+function createBoard(){
+    for(let y=0;y<ROW;y++){
+        board[y] = [];
+        for(let x=0;x<COL;x++){
+            board[y][x] = 0;
+        }
+    }
+}
+
+const shapes = [
+[[1,1,1,1]],
+[[1,1],[1,1]],
+[[0,1,0],[1,1,1]],
+[[1,1,0],[0,1,1]],
+[[0,1,1],[1,1,0]],
+[[1,0,0],[1,1,1]],
+[[0,0,1],[1,1,1]]
+];
+
+function newPiece(){
+    const shape = shapes[Math.floor(Math.random()*shapes.length)];
+    return {
+        shape: shape,
+        x:4,
+        y:0
+    };
+}
+
+let piece = newPiece();
+
+function drawCell(x,y,color){
+    ctx.fillStyle=color;
+    ctx.fillRect(x*SIZE,y*SIZE,SIZE,SIZE);
+    ctx.strokeStyle="#222";
+    ctx.strokeRect(x*SIZE,y*SIZE,SIZE,SIZE);
+}
+
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    for(let y=0;y<ROW;y++){
+        for(let x=0;x<COL;x++){
+            if(board[y][x]){
+                drawCell(x,y,"cyan");
+            }
+        }
+    }
+
+    piece.shape.forEach((row,y)=>{
+        row.forEach((value,x)=>{
+            if(value){
+                drawCell(piece.x+x,piece.y+y,"orange");
+            }
+        })
+    });
+}
+
+function collision(){
+    for(let y=0;y<piece.shape.length;y++){
+        for(let x=0;x<piece.shape[y].length;x++){
+            if(piece.shape[y][x]){
+                let newX = piece.x+x;
+                let newY = piece.y+y;
+
+                if(newX<0 || newX>=COL || newY>=ROW) return true;
+                if(newY>=0 && board[newY][newX]) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function merge(){
+    piece.shape.forEach((row,y)=>{
+        row.forEach((value,x)=>{
+            if(value){
+                board[piece.y+y][piece.x+x]=1;
+            }
+        })
+    });
+}
+
+function clearLines(){
+    for(let y=ROW-1;y>=0;y--){
+        if(board[y].every(v=>v===1)){
+            board.splice(y,1);
+            board.unshift(new Array(COL).fill(0));
+            score+=100;
+            document.getElementById("score").innerText="Score: "+score;
+        }
+    }
+}
+
+function rotate(){
+    const rotated = piece.shape[0].map((_,i)=>
+        piece.shape.map(row=>row[i]).reverse()
+    );
+
+    const old = piece.shape;
+    piece.shape = rotated;
+
+    if(collision()){
+        piece.shape = old;
+    }
+}
+
+document.addEventListener("keydown",e=>{
+    if(e.key==="ArrowLeft"){
+        piece.x--;
+        if(collision()) piece.x++;
+    }
+    else if(e.key==="ArrowRight"){
+        piece.x++;
+        if(collision()) piece.x--;
+    }
+    else if(e.key==="ArrowDown"){
+        piece.y++;
+        if(collision()){
+            piece.y--;
+            merge();
+            clearLines();
+            piece=newPiece();
+        }
+    }
+    else if(e.key==="ArrowUp"){
+        rotate();
+    }
+});
+
+function drop(){
+    piece.y++;
+
+    if(collision()){
+        piece.y--;
+        merge();
+        clearLines();
+        piece = newPiece();
+
+        if(collision()){
+            alert("ゲームオーバー");
+            createBoard();
+            score=0;
+        }
+    }
+
+    draw();
+}
+
+createBoard();
+draw();
+
+setInterval(drop,500);
+
+</script>
+</body>
+</html>
