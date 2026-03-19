@@ -15,12 +15,21 @@ font-family:sans-serif;
 canvas{
 background:#000;
 border:4px solid white;
+}
+
+#container{
+display:flex;
+justify-content:center;
+gap:20px;
 margin-top:20px;
 }
 
-#info{
-margin-top:10px;
-font-size:18px;
+.side{
+text-align:center;
+}
+
+h3{
+margin:5px;
 }
 </style>
 </head>
@@ -28,17 +37,38 @@ font-size:18px;
 <body>
 
 <h1>偽テトリス</h1>
-<div id="info">
+
+<div>
 Score: <span id="score">0</span> |
 High Score: <span id="highscore">0</span>
 </div>
 
+<div id="container">
+
+<div class="side">
+<h3>HOLD</h3>
+<canvas id="hold" width="80" height="80"></canvas>
+</div>
+
 <canvas id="game" width="240" height="400"></canvas>
+
+<div class="side">
+<h3>NEXT</h3>
+<canvas id="next" width="80" height="80"></canvas>
+</div>
+
+</div>
 
 <script>
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+
+const holdCanvas = document.getElementById("hold");
+const holdCtx = holdCanvas.getContext("2d");
+
+const nextCanvas = document.getElementById("next");
+const nextCtx = nextCanvas.getContext("2d");
 
 const COL = 12;
 const ROW = 20;
@@ -49,15 +79,6 @@ let score = 0;
 
 let highscore = localStorage.getItem("fakeTetrisHigh") || 0;
 document.getElementById("highscore").textContent = highscore;
-
-function createBoard(){
-for(let y=0;y<ROW;y++){
-board[y]=[];
-for(let x=0;x<COL;x++){
-board[y][x]=0;
-}
-}
-}
 
 const pieces = [
 
@@ -75,25 +96,47 @@ const pieces = [
 
 ];
 
-function newPiece(){
-const p = pieces[Math.floor(Math.random()*pieces.length)];
-return{
-shape:p.shape,
-color:p.color,
-x:4,
-y:0
-};
+function createBoard(){
+for(let y=0;y<ROW;y++){
+board[y]=[];
+for(let x=0;x<COL;x++){
+board[y][x]=0;
+}
+}
 }
 
-let piece = newPiece();
+function randomPiece(){
+return JSON.parse(JSON.stringify(
+pieces[Math.floor(Math.random()*pieces.length)]
+));
+}
 
-function drawCell(x,y,color,alpha=1){
-ctx.globalAlpha = alpha;
+let piece = null;
+let nextPiece = randomPiece();
+let holdPiece = null;
+let canHold = true;
+
+function spawnPiece(){
+
+piece = nextPiece;
+piece.x = 4;
+piece.y = 0;
+
+nextPiece = randomPiece();
+
+canHold = true;
+
+if(collision(piece.x,piece.y,piece.shape)){
+gameOver();
+}
+
+}
+
+function drawCell(ctx,x,y,color,size){
 ctx.fillStyle=color;
-ctx.fillRect(x*SIZE,y*SIZE,SIZE,SIZE);
+ctx.fillRect(x*size,y*size,size,size);
 ctx.strokeStyle="#222";
-ctx.strokeRect(x*SIZE,y*SIZE,SIZE,SIZE);
-ctx.globalAlpha = 1;
+ctx.strokeRect(x*size,y*size,size,size);
 }
 
 function collision(px,py,shape){
@@ -103,12 +146,12 @@ for(let x=0;x<shape[y].length;x++){
 
 if(shape[y][x]){
 
-let newX = px+x;
-let newY = py+y;
+let nx = px+x;
+let ny = py+y;
 
-if(newX<0 || newX>=COL || newY>=ROW) return true;
+if(nx<0 || nx>=COL || ny>=ROW) return true;
 
-if(newY>=0 && board[newY][newX]) return true;
+if(ny>=0 && board[ny][nx]) return true;
 
 }
 
@@ -138,7 +181,7 @@ ctx.clearRect(0,0,canvas.width,canvas.height);
 for(let y=0;y<ROW;y++){
 for(let x=0;x<COL;x++){
 if(board[y][x]){
-drawCell(x,y,board[y][x]);
+drawCell(ctx,x,y,board[y][x],SIZE);
 }
 }
 }
@@ -146,17 +189,40 @@ drawCell(x,y,board[y][x]);
 let ghostY = getGhostY();
 
 piece.shape.forEach((row,y)=>{
-row.forEach((value,x)=>{
-if(value){
-drawCell(piece.x+x,ghostY+y,piece.color,0.25);
+row.forEach((v,x)=>{
+if(v){
+ctx.globalAlpha=0.25;
+drawCell(ctx,piece.x+x,ghostY+y,piece.color,SIZE);
+ctx.globalAlpha=1;
 }
 });
 });
 
 piece.shape.forEach((row,y)=>{
-row.forEach((value,x)=>{
-if(value){
-drawCell(piece.x+x,piece.y+y,piece.color);
+row.forEach((v,x)=>{
+if(v){
+drawCell(ctx,piece.x+x,piece.y+y,piece.color,SIZE);
+}
+});
+});
+
+drawMini(nextCtx,nextPiece);
+drawMini(holdCtx,holdPiece);
+
+}
+
+function drawMini(context,p){
+
+context.clearRect(0,0,80,80);
+
+if(!p) return;
+
+const size=20;
+
+p.shape.forEach((row,y)=>{
+row.forEach((v,x)=>{
+if(v){
+drawCell(context,x+1,y+1,p.color,size);
 }
 });
 });
@@ -166,8 +232,8 @@ drawCell(piece.x+x,piece.y+y,piece.color);
 function merge(){
 
 piece.shape.forEach((row,y)=>{
-row.forEach((value,x)=>{
-if(value){
+row.forEach((v,x)=>{
+if(v){
 board[piece.y+y][piece.x+x]=piece.color;
 }
 });
@@ -185,7 +251,7 @@ board.splice(y,1);
 board.unshift(new Array(COL).fill(0));
 
 score+=100;
-document.getElementById("score").textContent = score;
+document.getElementById("score").textContent=score;
 
 }
 
@@ -208,6 +274,30 @@ piece.shape = old;
 
 }
 
+function hold(){
+
+if(!canHold) return;
+
+if(!holdPiece){
+
+holdPiece = piece;
+spawnPiece();
+
+}else{
+
+let temp = holdPiece;
+holdPiece = piece;
+
+piece = temp;
+piece.x=4;
+piece.y=0;
+
+}
+
+canHold=false;
+
+}
+
 document.addEventListener("keydown",e=>{
 
 if(e.key==="ArrowLeft"){
@@ -226,12 +316,16 @@ if(collision(piece.x,piece.y,piece.shape)){
 piece.y--;
 merge();
 clearLines();
-piece=newPiece();
+spawnPiece();
 }
 }
 
 else if(e.key==="ArrowUp"){
 rotate();
+}
+
+else if(e.key==="c" || e.key==="C"){
+hold();
 }
 
 draw();
@@ -249,11 +343,17 @@ piece.y--;
 merge();
 clearLines();
 
-piece = newPiece();
+spawnPiece();
 
-if(collision(piece.x,piece.y,piece.shape)){
+}
 
-if(score > highscore){
+draw();
+
+}
+
+function gameOver(){
+
+if(score>highscore){
 localStorage.setItem("fakeTetrisHigh",score);
 }
 
@@ -264,15 +364,12 @@ document.getElementById("score").textContent=0;
 
 createBoard();
 
-}
-
-}
-
-draw();
+spawnPiece();
 
 }
 
 createBoard();
+spawnPiece();
 draw();
 
 setInterval(drop,500);
