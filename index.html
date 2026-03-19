@@ -2,25 +2,25 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Tetris Style Puzzle</title>
+<title>偽テトリス</title>
 
 <style>
 body{
-    background:#111;
-    color:white;
-    text-align:center;
-    font-family:sans-serif;
+background:#111;
+color:white;
+text-align:center;
+font-family:sans-serif;
 }
 
 canvas{
-    background:#000;
-    margin-top:20px;
-    border:4px solid white;
+background:#000;
+border:4px solid white;
+margin-top:20px;
 }
 
-#score{
-    font-size:20px;
-    margin-top:10px;
+#info{
+margin-top:10px;
+font-size:18px;
 }
 </style>
 </head>
@@ -28,7 +28,11 @@ canvas{
 <body>
 
 <h1>偽テトリス</h1>
-<div id="score">Score: 0</div>
+<div id="info">
+Score: <span id="score">0</span> |
+High Score: <span id="highscore">0</span>
+</div>
+
 <canvas id="game" width="240" height="400"></canvas>
 
 <script>
@@ -43,152 +47,229 @@ const SIZE = 20;
 let board = [];
 let score = 0;
 
+let highscore = localStorage.getItem("fakeTetrisHigh") || 0;
+document.getElementById("highscore").textContent = highscore;
+
 function createBoard(){
-    for(let y=0;y<ROW;y++){
-        board[y] = [];
-        for(let x=0;x<COL;x++){
-            board[y][x] = 0;
-        }
-    }
+for(let y=0;y<ROW;y++){
+board[y]=[];
+for(let x=0;x<COL;x++){
+board[y][x]=0;
+}
+}
 }
 
-const shapes = [
-[[1,1,1,1]],
-[[1,1],[1,1]],
-[[0,1,0],[1,1,1]],
-[[1,1,0],[0,1,1]],
-[[0,1,1],[1,1,0]],
-[[1,0,0],[1,1,1]],
-[[0,0,1],[1,1,1]]
+const pieces = [
+
+{shape:[[1,1,1,1]],color:"cyan"},
+{shape:[[1,1],[1,1]],color:"yellow"},
+{shape:[[0,1,0],[1,1,1]],color:"purple"},
+{shape:[[1,1,0],[0,1,1]],color:"green"},
+{shape:[[0,1,1],[1,1,0]],color:"red"},
+{shape:[[1,0,0],[1,1,1]],color:"blue"},
+{shape:[[0,0,1],[1,1,1]],color:"orange"},
+
+{shape:[[1,1,1],[1,0,1]],color:"pink"},
+{shape:[[1,1,1],[0,1,0],[0,1,0]],color:"lime"},
+{shape:[[1,1,1],[1,1,0]],color:"gold"}
+
 ];
 
 function newPiece(){
-    const shape = shapes[Math.floor(Math.random()*shapes.length)];
-    return {
-        shape: shape,
-        x:4,
-        y:0
-    };
+const p = pieces[Math.floor(Math.random()*pieces.length)];
+return{
+shape:p.shape,
+color:p.color,
+x:4,
+y:0
+};
 }
 
 let piece = newPiece();
 
-function drawCell(x,y,color){
-    ctx.fillStyle=color;
-    ctx.fillRect(x*SIZE,y*SIZE,SIZE,SIZE);
-    ctx.strokeStyle="#222";
-    ctx.strokeRect(x*SIZE,y*SIZE,SIZE,SIZE);
+function drawCell(x,y,color,alpha=1){
+ctx.globalAlpha = alpha;
+ctx.fillStyle=color;
+ctx.fillRect(x*SIZE,y*SIZE,SIZE,SIZE);
+ctx.strokeStyle="#222";
+ctx.strokeRect(x*SIZE,y*SIZE,SIZE,SIZE);
+ctx.globalAlpha = 1;
+}
+
+function collision(px,py,shape){
+
+for(let y=0;y<shape.length;y++){
+for(let x=0;x<shape[y].length;x++){
+
+if(shape[y][x]){
+
+let newX = px+x;
+let newY = py+y;
+
+if(newX<0 || newX>=COL || newY>=ROW) return true;
+
+if(newY>=0 && board[newY][newX]) return true;
+
+}
+
+}
+}
+
+return false;
+
+}
+
+function getGhostY(){
+
+let ghostY = piece.y;
+
+while(!collision(piece.x,ghostY+1,piece.shape)){
+ghostY++;
+}
+
+return ghostY;
+
 }
 
 function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    for(let y=0;y<ROW;y++){
-        for(let x=0;x<COL;x++){
-            if(board[y][x]){
-                drawCell(x,y,"cyan");
-            }
-        }
-    }
+ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    piece.shape.forEach((row,y)=>{
-        row.forEach((value,x)=>{
-            if(value){
-                drawCell(piece.x+x,piece.y+y,"orange");
-            }
-        })
-    });
+for(let y=0;y<ROW;y++){
+for(let x=0;x<COL;x++){
+if(board[y][x]){
+drawCell(x,y,board[y][x]);
+}
+}
 }
 
-function collision(){
-    for(let y=0;y<piece.shape.length;y++){
-        for(let x=0;x<piece.shape[y].length;x++){
-            if(piece.shape[y][x]){
-                let newX = piece.x+x;
-                let newY = piece.y+y;
+let ghostY = getGhostY();
 
-                if(newX<0 || newX>=COL || newY>=ROW) return true;
-                if(newY>=0 && board[newY][newX]) return true;
-            }
-        }
-    }
-    return false;
+piece.shape.forEach((row,y)=>{
+row.forEach((value,x)=>{
+if(value){
+drawCell(piece.x+x,ghostY+y,piece.color,0.25);
+}
+});
+});
+
+piece.shape.forEach((row,y)=>{
+row.forEach((value,x)=>{
+if(value){
+drawCell(piece.x+x,piece.y+y,piece.color);
+}
+});
+});
+
 }
 
 function merge(){
-    piece.shape.forEach((row,y)=>{
-        row.forEach((value,x)=>{
-            if(value){
-                board[piece.y+y][piece.x+x]=1;
-            }
-        })
-    });
+
+piece.shape.forEach((row,y)=>{
+row.forEach((value,x)=>{
+if(value){
+board[piece.y+y][piece.x+x]=piece.color;
+}
+});
+});
+
 }
 
 function clearLines(){
-    for(let y=ROW-1;y>=0;y--){
-        if(board[y].every(v=>v===1)){
-            board.splice(y,1);
-            board.unshift(new Array(COL).fill(0));
-            score+=100;
-            document.getElementById("score").innerText="Score: "+score;
-        }
-    }
+
+for(let y=ROW-1;y>=0;y--){
+
+if(board[y].every(v=>v!==0)){
+
+board.splice(y,1);
+board.unshift(new Array(COL).fill(0));
+
+score+=100;
+document.getElementById("score").textContent = score;
+
+}
+
+}
+
 }
 
 function rotate(){
-    const rotated = piece.shape[0].map((_,i)=>
-        piece.shape.map(row=>row[i]).reverse()
-    );
 
-    const old = piece.shape;
-    piece.shape = rotated;
+const rotated = piece.shape[0].map((_,i)=>
+piece.shape.map(row=>row[i]).reverse()
+);
 
-    if(collision()){
-        piece.shape = old;
-    }
+const old = piece.shape;
+piece.shape = rotated;
+
+if(collision(piece.x,piece.y,piece.shape)){
+piece.shape = old;
+}
+
 }
 
 document.addEventListener("keydown",e=>{
-    if(e.key==="ArrowLeft"){
-        piece.x--;
-        if(collision()) piece.x++;
-    }
-    else if(e.key==="ArrowRight"){
-        piece.x++;
-        if(collision()) piece.x--;
-    }
-    else if(e.key==="ArrowDown"){
-        piece.y++;
-        if(collision()){
-            piece.y--;
-            merge();
-            clearLines();
-            piece=newPiece();
-        }
-    }
-    else if(e.key==="ArrowUp"){
-        rotate();
-    }
+
+if(e.key==="ArrowLeft"){
+piece.x--;
+if(collision(piece.x,piece.y,piece.shape)) piece.x++;
+}
+
+else if(e.key==="ArrowRight"){
+piece.x++;
+if(collision(piece.x,piece.y,piece.shape)) piece.x--;
+}
+
+else if(e.key==="ArrowDown"){
+piece.y++;
+if(collision(piece.x,piece.y,piece.shape)){
+piece.y--;
+merge();
+clearLines();
+piece=newPiece();
+}
+}
+
+else if(e.key==="ArrowUp"){
+rotate();
+}
+
+draw();
+
 });
 
 function drop(){
-    piece.y++;
 
-    if(collision()){
-        piece.y--;
-        merge();
-        clearLines();
-        piece = newPiece();
+piece.y++;
 
-        if(collision()){
-            alert("ゲームオーバー");
-            createBoard();
-            score=0;
-        }
-    }
+if(collision(piece.x,piece.y,piece.shape)){
 
-    draw();
+piece.y--;
+
+merge();
+clearLines();
+
+piece = newPiece();
+
+if(collision(piece.x,piece.y,piece.shape)){
+
+if(score > highscore){
+localStorage.setItem("fakeTetrisHigh",score);
+}
+
+alert("ゲームオーバー");
+
+score=0;
+document.getElementById("score").textContent=0;
+
+createBoard();
+
+}
+
+}
+
+draw();
+
 }
 
 createBoard();
@@ -197,5 +278,6 @@ draw();
 setInterval(drop,500);
 
 </script>
+
 </body>
 </html>
